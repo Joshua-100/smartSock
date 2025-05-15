@@ -1,24 +1,33 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Alert, TextInput, TouchableOpacity, Platform, StyleSheet} from 'react-native';
-import * as Notifications from 'expo-notifications';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert, Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Audio } from 'expo-av';
-import axios from 'axios';
+import * as Notifications from 'expo-notifications';
 
-import ESP32Connection from './components/ESP32Connection';
+import BLEConnection from './components/BLEConnection';
 import useAlarm from './hooks/useAlarm';
 import { sendNotification } from './utils/notifications';
 
-const SmartSockApp = () => {
-  const [ipAddress, setIpAddress] = useState('192.168.1.100');
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+const SERVICE_UUID = 'YOUR_SERVICE_UUID_HERE'; // replace with your ESP32 BLE service UUID
+const PRESSURE_CHAR_UUID = 'YOUR_PRESSURE_CHAR_UUID_HERE'; // replace with pressure characteristic UUID
+
+const App = () => {
   const [currentPressure, setCurrentPressure] = useState(0);
   const [threshold, setThreshold] = useState(1015);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdated, setLastUpdated] = useState('');
-  const intervalRef = useRef(null);
+  const [device, setDevice] = useState(null);
 
+  const intervalRef = useRef(null);
   const { soundRef, loadAlarm, playAlarm, stopAlarm } = useAlarm();
 
   useEffect(() => {
@@ -29,46 +38,59 @@ const SmartSockApp = () => {
     };
   }, []);
 
-  const checkPressure = async () => {
-    try {
-      const response = await axios.get(`http://${ipAddress}/pressure`, { timeout: 3000 });
-      const pressure = parseFloat(response.data);
-      setCurrentPressure(pressure);
-      setIsConnected(true);
-      setLastUpdated(new Date().toLocaleTimeString());
+  // Reads pressure from BLE characteristic (assumes value is float encoded as string)
+  const readPressureBLE = async () => {
+    if (!device) return;
 
-      if (pressure > threshold) {
-        playAlarm();
-        sendNotification(pressure);
-        Alert.alert(
-          "Sleepwalking Alert!",
-          `Pressure detected! Your child may be sleepwalking (${pressure.toFixed(2)} hPa)`,
-          [
-            { text: "Silence Alarm", onPress: stopAlarm, style: "destructive" },
-            { text: "OK", style: "cancel" }
-          ]
-        );
+    try {
+      const characteristic = await device.readCharacteristicForService(SERVICE_UUID, PRESSURE_CHAR_UUID);
+      const rawValue = characteristic.value; // base64 encoded string
+      const decodedValue = atob(rawValue); // decode base64 to string
+
+      const pressure = parseFloat(decodedValue);
+      if (!isNaN(pressure)) {
+        setCurrentPressure(pressure);
+        setLastUpdated(new Date().toLocaleTimeString());
+
+        if (pressure > threshold) {
+          playAlarm();
+          sendNotification(pressure);
+          Alert.alert(
+            "Sleepwalking Alert!",
+            `Pressure detected! Your child may be sleepwalking (${pressure.toFixed(2)} hPa)`,
+            [
+              { text: "Silence Alarm", onPress: stopAlarm, style: "destructive" },
+              { text: "OK", style: "cancel" }
+            ]
+          );
+        }
       }
     } catch (error) {
+      console.error("BLE Read Error:", error);
       setIsConnected(false);
-      console.error("Connection error:", error);
+      stopMonitoring();
     }
   };
 
-  const toggleMonitoring = () => {
+  const startMonitoring = () => {
     if (!isConnected) {
-      Alert.alert("Not Connected", "Please connect to the ESP32 first");
+      Alert.alert("Not Connected", "Please connect to the BLE device first");
       return;
     }
+    readPressureBLE(); // immediate read
+    intervalRef.current = setInterval(readPressureBLE, 3000);
+    setIsMonitoring(true);
+  };
 
-    if (isMonitoring) {
-      clearInterval(intervalRef.current);
-      setIsMonitoring(false);
-    } else {
-      checkPressure();
-      intervalRef.current = setInterval(checkPressure, 3000);
-      setIsMonitoring(true);
-    }
+  const stopMonitoring = () => {
+    clearInterval(intervalRef.current);
+    setIsMonitoring(false);
+    stopAlarm();
+  };
+
+  const toggleMonitoring = () => {
+    if (isMonitoring) stopMonitoring();
+    else startMonitoring();
   };
 
   return (
@@ -77,16 +99,18 @@ const SmartSockApp = () => {
         <Text style={styles.title}>Smart Sock</Text>
         <Text style={styles.subtitle}>SleepWalking Accident Prevention System</Text>
 
-        <ESP32Connection
-          ipAddress={ipAddress}
-          setIpAddress={setIpAddress}
+        <BLEConnection
+          serviceUUID={SERVICE_UUID}
+          pressureCharUUID={PRESSURE_CHAR_UUID}
+          device={device}
+          setDevice={setDevice}
           isConnected={isConnected}
           setIsConnected={setIsConnected}
-          onConnect={() => console.log("Connected to ESP32")}
           onDisconnect={() => {
             setIsMonitoring(false);
             clearInterval(intervalRef.current);
-            console.log("Disconnected from ESP32");
+            setCurrentPressure(0);
+            setLastUpdated('');
           }}
         />
 
@@ -121,9 +145,7 @@ const SmartSockApp = () => {
             size={24}
             color="white"
           />
-          <Text style={styles.buttonText}>
-            {isMonitoring ? 'STOP MONITORING' : 'START MONITORING'}
-          </Text>
+          <Text style={styles.buttonText}>{isMonitoring ? 'STOP MONITORING' : 'START MONITORING'}</Text>
         </TouchableOpacity>
       </View>
     </LinearGradient>
@@ -131,27 +153,10 @@ const SmartSockApp = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: 25,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#2c3e50',
-    textAlign: 'center',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#7f8c8d',
-    textAlign: 'center',
-    marginBottom: 40,
-  },
+  container: { flex: 1 },
+  content: { flex: 1, padding: 25, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
+  title: { fontSize: 28, fontWeight: '700', color: '#2c3e50', textAlign: 'center', marginBottom: 5 },
+  subtitle: { fontSize: 16, color: '#7f8c8d', textAlign: 'center', marginBottom: 40 },
   pressureContainer: {
     backgroundColor: 'white',
     borderRadius: 20,
@@ -164,21 +169,9 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
   },
-  pressureValue: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#2c3e50',
-  },
-  pressureLabel: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    marginTop: 5,
-    letterSpacing: 1,
-  },
-  unit: {
-    fontSize: 24,
-    color: '#95a5a6',
-  },
+  pressureValue: { fontSize: 48, fontWeight: '700', color: '#2c3e50' },
+  pressureLabel: { fontSize: 14, color: '#7f8c8d', marginTop: 5, letterSpacing: 1 },
+  unit: { fontSize: 24, color: '#95a5a6' },
   thresholdContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -187,11 +180,7 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 20,
   },
-  thresholdLabel: {
-    flex: 1,
-    fontSize: 16,
-    color: '#7f8c8d',
-  },
+  thresholdLabel: { flex: 1, fontSize: 16, color: '#7f8c8d' },
   thresholdInput: {
     width: 80,
     fontSize: 18,
@@ -202,30 +191,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#bdc3c7',
   },
-  input: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 20,
-    fontSize: 16,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  statusIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  statusText: {
-    fontSize: 14,
-    color: '#7f8c8d',
-  },
+  statusText: { fontSize: 14, color: '#7f8c8d', marginBottom: 20 },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -238,18 +204,9 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 3,
   },
-  startButton: {
-    backgroundColor: '#2ecc71',
-  },
-  stopButton: {
-    backgroundColor: '#e74c3c',
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 10,
-  },
+  startButton: { backgroundColor: '#2ecc71' },
+  stopButton: { backgroundColor: '#e74c3c' },
+  buttonText: { color: 'white', fontSize: 16, fontWeight: '600', marginLeft: 10 },
 });
 
-export default SmartSockApp;
+export default App;
