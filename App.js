@@ -1,305 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, Alert, TouchableOpacity, Platform, Modal } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, Alert, TextInput, TouchableOpacity, Platform, StyleSheet} from 'react-native';
 import * as Notifications from 'expo-notifications';
-import axios from 'axios';
-import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Audio } from 'expo-av';
+import axios from 'axios';
 
-// Configure notifications
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
-
-// ESP32 Connection Component
-const ESP32Connection = ({ 
-  ipAddress, 
-  setIpAddress, 
-  isConnected, 
-  setIsConnected,
-  onConnect,
-  onDisconnect
-}) => {
-  const [ssid, setSsid] = useState('');
-  const [password, setPassword] = useState('');
-  const [isConfiguring, setIsConfiguring] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState('disconnected');
-
-  const configureESP32 = async () => {
-    try {
-      setConnectionStatus('configuring');
-      const response = await axios.post(`http://${ipAddress}/configure`, {
-        ssid,
-        password
-      }, { timeout: 5000 });
-      
-      if (response.data.success) {
-        Alert.alert("Success", "ESP32 configured successfully!");
-        setIsConnected(true);
-        onConnect();
-        setConnectionStatus('connected');
-      } else {
-        throw new Error(response.data.message || "Configuration failed");
-      }
-    } catch (error) {
-      Alert.alert("Error", `Failed to configure ESP32: ${error.message}`);
-      setConnectionStatus('error');
-      onDisconnect();
-    } finally {
-      setIsConfiguring(false);
-    }
-  };
-
-  const testConnection = async () => {
-    try {
-      setConnectionStatus('testing');
-      const response = await axios.get(`http://${ipAddress}/ping`, { timeout: 3000 });
-      if (response.data === "pong") {
-        setIsConnected(true);
-        onConnect();
-        setConnectionStatus('connected');
-        Alert.alert("Success", "ESP32 connection successful!");
-      } else {
-        throw new Error("Invalid response from ESP32");
-      }
-    } catch (error) {
-      setIsConnected(false);
-      onDisconnect();
-      setConnectionStatus('error');
-      Alert.alert("Error", `Connection test failed: ${error.message}`);
-    }
-  };
-
-  return (
-    <View style={connectionStyles.container}>
-      <TouchableOpacity 
-        style={connectionStyles.connectionButton}
-        onPress={() => setIsConfiguring(true)}
-      >
-        <Ionicons 
-          name={isConnected ? 'wifi' : 'wifi-off'} 
-          size={24} 
-          color={isConnected ? '#4CAF50' : '#F44336'} 
-        />
-        <Text style={connectionStyles.connectionText}>
-          {isConnected ? 'Connected' : 'Disconnected'}
-        </Text>
-      </TouchableOpacity>
-
-      <Modal
-        visible={isConfiguring}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsConfiguring(false)}
-      >
-        <View style={connectionStyles.modalContainer}>
-          <View style={connectionStyles.modalContent}>
-            <Text style={connectionStyles.modalTitle}>ESP32 Configuration</Text>
-            
-            <TextInput
-              style={connectionStyles.input}
-              placeholder="ESP32 IP Address"
-              value={ipAddress}
-              onChangeText={setIpAddress}
-              keyboardType="numeric"
-            />
-            
-            <TextInput
-              style={connectionStyles.input}
-              placeholder="WiFi SSID"
-              value={ssid}
-              onChangeText={setSsid}
-            />
-            
-            <TextInput
-              style={connectionStyles.input}
-              placeholder="WiFi Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-            
-            <View style={connectionStyles.buttonRow}>
-              <TouchableOpacity 
-                style={[connectionStyles.button, connectionStyles.testButton]}
-                onPress={testConnection}
-              >
-                <Text style={connectionStyles.buttonText}>Test Connection</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[connectionStyles.button, connectionStyles.configButton]}
-                onPress={configureESP32}
-              >
-                <Text style={connectionStyles.buttonText}>Configure WiFi</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity 
-              style={connectionStyles.closeButton}
-              onPress={() => setIsConfiguring(false)}
-            >
-              <Text style={connectionStyles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-            
-            <Text style={connectionStyles.statusText}>
-              Status: {connectionStatus.toUpperCase()}
-            </Text>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-};
-
-const connectionStyles = StyleSheet.create({
-  container: {
-    marginBottom: 20,
-  },
-  connectionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-  },
-  connectionText: {
-    marginLeft: 8,
-    fontSize: 16,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    margin: 20,
-    padding: 20,
-    borderRadius: 10,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 10,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  button: {
-    padding: 10,
-    borderRadius: 5,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 5,
-  },
-  testButton: {
-    backgroundColor: '#2196F3',
-  },
-  configButton: {
-    backgroundColor: '#4CAF50',
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#f44336',
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  statusText: {
-    marginTop: 10,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-});
+import ESP32Connection from './components/ESP32Connection';
+import useAlarm from './hooks/useAlarm';
+import { sendNotification } from './utils/notifications';
 
 const SmartSockApp = () => {
-  // State management
   const [ipAddress, setIpAddress] = useState('192.168.1.100');
   const [currentPressure, setCurrentPressure] = useState(0);
   const [threshold, setThreshold] = useState(1015);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdated, setLastUpdated] = useState('');
-  const soundRef = useRef(null);
   const intervalRef = useRef(null);
 
-  // Load alarm sound
+  const { soundRef, loadAlarm, playAlarm, stopAlarm } = useAlarm();
+
   useEffect(() => {
-    const loadResources = async () => {
-      try {
-        const { sound } = await Audio.Sound.createAsync(
-          require('./assets/alarm1.wav')
-        );
-        soundRef.current = sound;
-      } catch (error) {
-        console.error('Error loading sound:', error);
-      }
-    };
-
-    loadResources();
-
+    loadAlarm();
     return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-      stopMonitoring();
+      stopAlarm();
+      clearInterval(intervalRef.current);
     };
   }, []);
 
-  // Alarm functions
-  const playAlarm = async () => {
-    try {
-      await soundRef.current.replayAsync();
-    } catch (error) {
-      console.error('Error playing sound:', error);
-    }
-  };
-
-  const stopAlarm = async () => {
-    try {
-      await soundRef.current.stopAsync();
-    } catch (error) {
-      console.error('Error stopping sound:', error);
-    }
-  };
-
-  // Notification functions
-  const sendNotification = async () => {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "⚠️ Sleepwalking Alert!",
-        body: `Pressure detected! Your child may be sleepwalking (${currentPressure.toFixed(2)} hPa)`,
-        sound: true,
-        vibrate: [0, 250, 250, 250],
-      },
-      trigger: null,
-    });
-  };
-
-  // Pressure monitoring
   const checkPressure = async () => {
     try {
       const response = await axios.get(`http://${ipAddress}/pressure`, { timeout: 3000 });
@@ -310,20 +39,13 @@ const SmartSockApp = () => {
 
       if (pressure > threshold) {
         playAlarm();
-        sendNotification();
+        sendNotification(pressure);
         Alert.alert(
           "Sleepwalking Alert!",
           `Pressure detected! Your child may be sleepwalking (${pressure.toFixed(2)} hPa)`,
           [
-            {
-              text: "Silence Alarm",
-              onPress: stopAlarm,
-              style: "destructive"
-            },
-            {
-              text: "OK",
-              style: "cancel"
-            }
+            { text: "Silence Alarm", onPress: stopAlarm, style: "destructive" },
+            { text: "OK", style: "cancel" }
           ]
         );
       }
@@ -333,34 +55,24 @@ const SmartSockApp = () => {
     }
   };
 
-  // Control functions
-  const startMonitoring = () => {
+  const toggleMonitoring = () => {
     if (!isConnected) {
       Alert.alert("Not Connected", "Please connect to the ESP32 first");
       return;
     }
-    checkPressure(); // Immediate check
-    intervalRef.current = setInterval(checkPressure, 3000);
-    setIsMonitoring(true);
-  };
 
-  const stopMonitoring = () => {
-    if (intervalRef.current) {
+    if (isMonitoring) {
       clearInterval(intervalRef.current);
-      intervalRef.current = null;
+      setIsMonitoring(false);
+    } else {
+      checkPressure();
+      intervalRef.current = setInterval(checkPressure, 3000);
+      setIsMonitoring(true);
     }
-    setIsMonitoring(false);
-  };
-
-  const toggleMonitoring = () => {
-    isMonitoring ? stopMonitoring() : startMonitoring();
   };
 
   return (
-    <LinearGradient
-      colors={['#f5f7fa', '#c3cfe2']}
-      style={styles.container}
-    >
+    <LinearGradient colors={['#f5f7fa', '#c3cfe2']} style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>Smart Sock</Text>
         <Text style={styles.subtitle}>SleepWalking Accident Prevention System</Text>
@@ -372,7 +84,8 @@ const SmartSockApp = () => {
           setIsConnected={setIsConnected}
           onConnect={() => console.log("Connected to ESP32")}
           onDisconnect={() => {
-            stopMonitoring();
+            setIsMonitoring(false);
+            clearInterval(intervalRef.current);
             console.log("Disconnected from ESP32");
           }}
         />
@@ -396,11 +109,7 @@ const SmartSockApp = () => {
           <Text style={styles.unit}>hPa</Text>
         </View>
 
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>
-            Last update: {lastUpdated || 'Never'}
-          </Text>
-        </View>
+        <Text style={styles.statusText}>Last update: {lastUpdated || 'Never'}</Text>
 
         <TouchableOpacity
           style={[styles.button, isMonitoring ? styles.stopButton : styles.startButton]}
