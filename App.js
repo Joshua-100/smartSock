@@ -129,17 +129,13 @@ const readPressureBLE = async () => {
 </View>
 
 
-        <View style={styles.thresholdContainer}>
-          <Text style={styles.thresholdLabel}>Alert Threshold:</Text>
-          <TextInput
-            style={styles.thresholdInput}
-            value={threshold.toString()}
-            onChangeText={(text) => setThreshold(parseFloat(text) || 0)}
-            keyboardType="numeric"
-            placeholder="Set threshold"
-          />
-          <Text style={styles.unit}>hPa</Text>
-        </View>
+<View style={styles.soundTestContainer}>
+  <Text style={styles.soundTestText}>🔔 Test Alarm Sound</Text>
+  <TouchableOpacity style={styles.testButton} onPress={playAlarm}>
+    <Text style={styles.testButtonText}>Play Alarm</Text>
+  </TouchableOpacity>
+</View>
+
 
         <Text style={styles.statusText}>Last update: {lastUpdated || 'Never'}</Text>
 
@@ -177,6 +173,26 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
   },
+soundTestContainer: {
+  alignItems: 'center',
+  marginBottom: 20,
+},
+soundTestText: {
+  fontSize: 14,
+  color: '#2c3e50',
+  marginBottom: 10,
+},
+testButton: {
+  backgroundColor: '#2ecc71',
+  paddingHorizontal: 20,
+  paddingVertical: 10,
+  borderRadius: 10,
+},
+testButtonText: {
+  color: 'white',
+  fontWeight: 'bold',
+},
+  
   pressureValue: { fontSize: 48, fontWeight: '700', color: '#2c3e50' },
   pressureLabel: { fontSize: 14, color: '#7f8c8d', marginTop: 5, letterSpacing: 1 },
   unit: { fontSize: 24, color: '#95a5a6' },
