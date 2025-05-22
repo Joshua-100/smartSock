@@ -123,13 +123,6 @@ const readPressureBLE = async () => {
           }}
         />
 
-        {/* <View style={styles.pressureContainer}>
-          <Text style={styles.pressureValue}>
-            {currentPressure.toFixed(2)} <Text style={styles.unit}>hPa</Text>
-          </Text>
-          <Text style={styles.pressureLabel}>FOOT PRESSURE</Text>
-        </View> */}
-
         <View style={styles.pressureContainer}>
   <Text style={styles.pressureValue}>{gaitStatus}</Text>
   <Text style={styles.pressureLabel}>GAIT STATUS</Text>
