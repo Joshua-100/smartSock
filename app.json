@@ -20,6 +20,14 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": [
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "bluetoothMode": "central",
       "edgeToEdgeEnabled": true,
       "package": "com.joshua100.smartsock"
     },
@@ -30,6 +38,9 @@
       "eas": {
         "projectId": "fcc2af36-e0c6-4c02-a1a7-ea96e6d27507"
       }
-    }
+    },
+    "plugins": [
+      "expo-audio"
+    ]
   }
 }

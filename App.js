@@ -8,6 +8,9 @@ import BLEConnection from './components/BLEConnection';
 import useAlarm from './hooks/useAlarm';
 import { sendNotification } from './utils/notifications';
 
+import { decode as atob } from 'base-64';
+
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -16,11 +19,11 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const SERVICE_UUID = 'YOUR_SERVICE_UUID_HERE'; // replace with your ESP32 BLE service UUID
-const PRESSURE_CHAR_UUID = 'YOUR_PRESSURE_CHAR_UUID_HERE'; // replace with pressure characteristic UUID
+const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc'; // replace with your ESP32 BLE service UUID
+const PRESSURE_CHAR_UUID = 'abcd1234-5678-90ab-cdef-1234567890ab'; // replace with pressure characteristic UUID
 
 const App = () => {
-  const [currentPressure, setCurrentPressure] = useState(0);
+  const [gaitStatus, setGaitStatus] = useState("Unknown");
   const [threshold, setThreshold] = useState(1015);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -39,38 +42,37 @@ const App = () => {
   }, []);
 
   // Reads pressure from BLE characteristic (assumes value is float encoded as string)
-  const readPressureBLE = async () => {
-    if (!device) return;
+const readPressureBLE = async () => {
+  if (!device) return;
 
-    try {
-      const characteristic = await device.readCharacteristicForService(SERVICE_UUID, PRESSURE_CHAR_UUID);
-      const rawValue = characteristic.value; // base64 encoded string
-      const decodedValue = atob(rawValue); // decode base64 to string
+  try {
+    const characteristic = await device.readCharacteristicForService(SERVICE_UUID, PRESSURE_CHAR_UUID);
+    const rawValue = characteristic.value;
+    const decodedValue = atob(rawValue); // e.g., "HEEL_STRIKE"
 
-      const pressure = parseFloat(decodedValue);
-      if (!isNaN(pressure)) {
-        setCurrentPressure(pressure);
-        setLastUpdated(new Date().toLocaleTimeString());
+    setGaitStatus(decodedValue);
+    setLastUpdated(new Date().toLocaleTimeString());
 
-        if (pressure > threshold) {
-          playAlarm();
-          sendNotification(pressure);
-          Alert.alert(
-            "Sleepwalking Alert!",
-            `Pressure detected! Your child may be sleepwalking (${pressure.toFixed(2)} hPa)`,
-            [
-              { text: "Silence Alarm", onPress: stopAlarm, style: "destructive" },
-              { text: "OK", style: "cancel" }
-            ]
-          );
-        }
-      }
-    } catch (error) {
-      console.error("BLE Read Error:", error);
-      setIsConnected(false);
-      stopMonitoring();
+    if (decodedValue === "WALKING") {
+      playAlarm();
+      sendNotification(decodedValue);
+      Alert.alert(
+        "Sleepwalking Alert!",
+        `Motion detected: ${decodedValue}`,
+        [
+          { text: "Silence Alarm", onPress: stopAlarm, style: "destructive" },
+          { text: "OK", style: "cancel" }
+        ]
+      );
     }
-  };
+
+  } catch (error) {
+    console.error("BLE Read Error:", error);
+    setIsConnected(false);
+    stopMonitoring();
+  }
+};
+
 
   const startMonitoring = () => {
     if (!isConnected) {
@@ -114,12 +116,18 @@ const App = () => {
           }}
         />
 
-        <View style={styles.pressureContainer}>
+        {/* <View style={styles.pressureContainer}>
           <Text style={styles.pressureValue}>
             {currentPressure.toFixed(2)} <Text style={styles.unit}>hPa</Text>
           </Text>
           <Text style={styles.pressureLabel}>FOOT PRESSURE</Text>
-        </View>
+        </View> */}
+
+        <View style={styles.pressureContainer}>
+  <Text style={styles.pressureValue}>{gaitStatus}</Text>
+  <Text style={styles.pressureLabel}>GAIT STATUS</Text>
+</View>
+
 
         <View style={styles.thresholdContainer}>
           <Text style={styles.thresholdLabel}>Alert Threshold:</Text>
