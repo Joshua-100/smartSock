@@ -74,7 +74,6 @@ const readPressureBLE = async () => {
       Alert.alert("Disconnected", "The BLE device was disconnected.");
       setIsConnected(false);
       stopMonitoring(); // stop interval + alarm
-      setGaitStatus("Disconnected");
     }
   }
 };
