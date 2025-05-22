@@ -68,10 +68,17 @@ const readPressureBLE = async () => {
 
   } catch (error) {
     console.error("BLE Read Error:", error);
-    setIsConnected(false);
-    stopMonitoring();
+
+    // 🛑 Check if error is due to disconnection
+    if (error.message?.includes('disconnected')) {
+      Alert.alert("Disconnected", "The BLE device was disconnected.");
+      setIsConnected(false);
+      stopMonitoring(); // stop interval + alarm
+      setGaitStatus("Disconnected");
+    }
   }
 };
+
 
 
   const startMonitoring = () => {
