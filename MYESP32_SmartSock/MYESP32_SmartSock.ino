@@ -10,9 +10,9 @@ const int LED_PIN = 2;      // Visual indicator
 const int BUZZER_PIN = 27;  // Passive buzzer GPIO27
 
 // Gait Detection Thresholds
-const int HEEL_THRESH = 9;
-const int TOE_THRESH = 8;
-const int GAIT_TIME_MS = 800;  // Max time between heel strike and toe push
+const int HEEL_THRESH = 3;
+const int TOE_THRESH = 1;
+const int GAIT_TIME_MS = 500;  // Max time between heel strike and toe push
 
 // BLE UUIDs (generate your own for production)
 #define SERVICE_UUID           "12345678-1234-1234-1234-123456789abc"
@@ -33,11 +33,11 @@ int currentPressureValue = 0;
 // In Caseclient disconets, we need to restart server so other devices that are able to connect can connect
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
-    Serial.println("BLE client connected");
+    // Serial.println("BLE client connected");
   }
 
   void onDisconnect(BLEServer* pServer) {
-    Serial.println("BLE client disconnected, restarting advertising...");
+    // Serial.println("BLE client disconnected, restarting advertising...");
     delay(100); // Small delay to allow stack to reset
     BLEDevice::getAdvertising()->start();  // Restart advertising
   }
@@ -45,7 +45,8 @@ class MyServerCallbacks : public BLEServerCallbacks {
 
 
 void setup() {
-  Serial.begin(115200);
+  // Serial.begin(115200);
+
 
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
@@ -69,8 +70,8 @@ void setup() {
   pAdvertising->addServiceUUID(SERVICE_UUID);
   pAdvertising->start();
 
-  Serial.println("BLE service started");
-  Serial.println("Sleepwalking Detection System Ready");
+  // Serial.println("BLE service started");
+  // Serial.println("Sleepwalking Detection System Ready");
 }
 
 
@@ -89,21 +90,21 @@ void loop() {
       if (heel > HEEL_THRESH) {
         currentState = HEEL_STRIKE;
         gaitTimer = millis();
-        Serial.println("Heel strike detected");
+        // Serial.println("Heel strike detected");
       }
       break;
 
     case HEEL_STRIKE:
       if (toe > TOE_THRESH) {
         currentState = TOE_PUSH;
-        Serial.println("Toe push detected");
+        // Serial.println("Toe push detected");
       } else if (millis() - gaitTimer > GAIT_TIME_MS) {
         currentState = SLEEPING;
       }
       break;
 
     case TOE_PUSH:
-      Serial.println("WALKING CONFIRMED - BUZZER ON");
+      // Serial.println("WALKING CONFIRMED - BUZZER ON");
       digitalWrite(LED_PIN, HIGH);
       tone(BUZZER_PIN, 1000);  // 1kHz tone
       gaitTimer = millis();
@@ -114,7 +115,7 @@ void loop() {
       if (heel < HEEL_THRESH && toe < TOE_THRESH) {
         if (millis() - gaitTimer > 3000) {  // 3s no activity
           currentState = SLEEPING;
-          Serial.println("Returned to sleep - BUZZER OFF");
+          // Serial.println("Returned to sleep - BUZZER OFF");
           noTone(BUZZER_PIN);
           digitalWrite(LED_PIN, LOW);
         }
@@ -139,5 +140,5 @@ pressureCharacteristic->setValue(gaitStatusStr.c_str());
 pressureCharacteristic->notify();
 
 
-  delay(800);  // Update BLE every second
+  delay(500);  // Update BLE every second
 }

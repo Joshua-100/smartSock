@@ -232,4 +232,4 @@ testButtonText: {
   buttonText: { color: 'white', fontSize: 16, fontWeight: '600', marginLeft: 10 },
 });
 
-export default App;6
+export default App;
