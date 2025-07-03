@@ -14,7 +14,7 @@ const int HEEL_THRESH = 3;
 const int TOE_THRESH = 1;
 const int GAIT_TIME_MS = 500;  // Max time between heel strike and toe push
 
-// BLE UUIDs (generate your own for production)
+// BLE UUIDs 
 #define SERVICE_UUID           "12345678-1234-1234-1234-123456789abc"
 #define PRESSURE_CHAR_UUID     "abcd1234-5678-90ab-cdef-1234567890ab"
 
